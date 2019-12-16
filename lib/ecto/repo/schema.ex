@@ -35,6 +35,7 @@ defmodule Ecto.Repo.Schema do
     {adapter, adapter_meta} = Ecto.Repo.Registry.lookup(name)
     autogen_id = schema && schema.__schema__(:autogenerate_id)
     dumper = schema && schema.__schema__(:dump)
+             |> merge_extra_fields(Keyword.get(opts, :extra_fields, []))
 
     {return_fields_or_types, return_sources} =
       schema
@@ -211,11 +212,14 @@ defmodule Ecto.Repo.Schema do
     {adapter, adapter_meta} = Ecto.Repo.Registry.lookup(name)
     %{prepare: prepare, repo_opts: repo_opts} = changeset
     opts = Keyword.merge(repo_opts, opts)
+    extra_fields = Keyword.get(opts, :extra_fields, [])
 
     struct = struct_from_changeset!(:insert, changeset)
     schema = struct.__struct__
     dumper = schema.__schema__(:dump)
+             |> merge_extra_fields(extra_fields)
     fields = schema.__schema__(:fields)
+             |> Enum.concat(Keyword.keys(extra_fields))
     assocs = schema.__schema__(:associations)
     embeds = schema.__schema__(:embeds)
 
@@ -301,11 +305,14 @@ defmodule Ecto.Repo.Schema do
     {adapter, adapter_meta} = Ecto.Repo.Registry.lookup(name)
     %{prepare: prepare, repo_opts: repo_opts} = changeset
     opts = Keyword.merge(repo_opts, opts)
+    extra_fields = Keyword.get(opts, :extra_fields, [])
 
     struct = struct_from_changeset!(:update, changeset)
     schema = struct.__struct__
-    dumper = schema.__schema__(:dump)
+    dumper = schema.__schema__(:dump) |> Map.put_new(:extra, {:extra, :map})
+             |> merge_extra_fields(extra_fields)
     fields = schema.__schema__(:fields)
+             |> Enum.concat(Keyword.keys(extra_fields))
     assocs = schema.__schema__(:associations)
     embeds = schema.__schema__(:embeds)
 
@@ -943,5 +950,12 @@ defmodule Ecto.Repo.Schema do
       {alias, type} = Map.fetch!(dumper, field)
       {alias, dump_field!(action, schema, field, type, value, adapter)}
     end
+  end
+
+  defp merge_extra_fields(dumper, extra_fields) do
+    Enum.reduce(extra_fields, %{}, fn {source, type}, fields ->
+      Map.put_new(fields, source, {source, type})
+    end)
+    |> Map.merge(dumper)
   end
 end
