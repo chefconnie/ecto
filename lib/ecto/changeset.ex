@@ -493,6 +493,8 @@ defmodule Ecto.Changeset do
   defp cast(%{} = data, %{} = types, %{} = changes, %{} = params, permitted, opts) when is_list(permitted) do
     {empty_values, _opts} = Keyword.pop(opts, :empty_values, @empty_values)
     params = convert_params(params)
+    all_types = Keyword.get(opts, :extra_types, %{})
+                |> Map.merge(types)
 
     defaults = case data do
       %{__struct__: struct} -> struct.__struct__()
@@ -501,11 +503,11 @@ defmodule Ecto.Changeset do
 
     {changes, errors, valid?} =
       Enum.reduce(permitted, {changes, [], true},
-                  &process_param(&1, params, types, data, empty_values, defaults, &2))
+                  &process_param(&1, params, all_types, data, empty_values, defaults, &2))
 
     %Changeset{params: params, data: data, valid?: valid?,
                errors: Enum.reverse(errors), changes: changes,
-               types: types, empty_values: empty_values}
+               types: all_types, empty_values: empty_values}
   end
 
   defp cast(%{}, %{}, %{}, params, permitted, _opts) when is_list(permitted) do
